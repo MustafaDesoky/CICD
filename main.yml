@@ -1,0 +1,7 @@
+---
+ - name: configure fresh created EC2 using ansible
+   hosts: all
+   user: ec2-user
+   become: true
+   roles:
+   - setup
