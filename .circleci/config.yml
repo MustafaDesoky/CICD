@@ -15,18 +15,18 @@ commands:
          command: |
               aws cloudformation delete-stack --stack-name myStack-${CIRCLE_WORKFLOW_ID:0:5}
 jobs:
-  create_infrastructure: 
-      docker:
-        - image: amazon/aws-cli
-      steps:
-        - checkout
-        - run:
-            name: Create Cloudformation Stack
-            command: |
-              aws cloudformation deploy \
-                --template-file ./ec2.yml \
-                --stack-name myStack-${CIRCLE_WORKFLOW_ID:0:5} \
-                --region us-east-1
+  #.create_infrastructure: 
+      #docker:
+      #  - image: amazon/aws-cli
+     # steps:
+        #- checkout
+       # - run:
+         #   name: Create Cloudformation Stack
+        #    command: |
+       #       aws cloudformation deploy \
+      #          --template-file ./ec2.yml \
+     #           --stack-name myStack-${CIRCLE_WORKFLOW_ID:0:5} \
+    #            --region us-east-1
   configure_infra:
     # Specify the execution environment. You can specify an image from Dockerhub or use one of our Convenience Images from CircleCI's Developer Hub.
     # See: https://circleci.com/docs/2.0/configuration-reference/#docker-machine-macos-windows-executor
@@ -86,15 +86,15 @@ jobs:
     steps:
       - checkout
       - run:
-        name: Execute bucket.yml - Create Cloudformation Stack
-        command: |
-          aws cloudformation deploy \
-          --template-file bucket.yml \
-          --stack-name stack-create-bucket-${CIRCLE_WORKFLOW_ID:0:7} \
-          --parameter-overrides MyBucketName="mybucket-${CIRCLE_WORKFLOW_ID:0:7}" 
+          name: Execute bucket.yml - Create Cloudformation Stack
+          command: |
+              aws cloudformation deploy \
+              --template-file bucket.yml \
+              --stack-name stack-create-bucket-${CIRCLE_WORKFLOW_ID:0:7} \
+              --parameter-overrides MyBucketName="mybucket-${CIRCLE_WORKFLOW_ID:0:7}" 
         #CIRCLE_WORKFLOW_ID:0:7to help form the name of our new bucket. This helps us to reference the bucket later, in another job/command.
         # Uncomment the step below if yoou wish to upload all contents of the current directory to the S3 bucket
-        - run: aws s3 sync . s3://mybucket-${CIRCLE_WORKFLOW_ID:0:7} --delete  
+      - run: aws s3 sync . s3://mybucket-${CIRCLE_WORKFLOW_ID:0:7} --delete  
 
   get_last_deployment_id:
     docker:
@@ -104,7 +104,7 @@ jobs:
     #performs the query and saves the id to a file that we can persist to the workspace. 
     - run: yum install -y tar gzip
     - run: 
-      command: |
+        command: |
             aws cloudformation \
             list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
             --no-paginate --output text > ~/textfile.txt
