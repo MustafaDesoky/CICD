@@ -64,7 +64,86 @@ jobs:
           else
             return 1
           fi
-    - destroy_infra    
+    - destroy_infra   
+
+  create_infrastructure:
+    docker: 
+      - image: amazon/aws-cli
+    steps:
+    - checkout
+    - run:
+        command: |     
+          S3_BUCKET_NAME="mybucket2970808"
+          aws cloudformation deploy \
+          --template-file cloudfront.yml \
+          --stack-name production-distro \
+          --parameter-overrides PipelineID="${S3_BUCKET_NAME}" \ # Name of the S3 bucket you created manually.
+          --tags project=udapeople &   
+
+  create_and_deploy_front_end:
+    docker:
+      - image: amazon/aws-cli
+    steps:
+      - checkout
+      - run:
+        name: Execute bucket.yaml - Create Cloudformation Stack
+        command: |
+          aws cloudformation deploy \
+          --template-file bucket.yaml \
+          --stack-name stack-create-bucket-${CIRCLE_WORKFLOW_ID:0:7} \
+          --parameter-overrides MyBucketName="mybucket-${CIRCLE_WORKFLOW_ID:0:7}" 
+        #CIRCLE_WORKFLOW_ID:0:7to help form the name of our new bucket. This helps us to reference the bucket later, in another job/command.
+        # Uncomment the step below if yoou wish to upload all contents of the current directory to the S3 bucket
+        - run: aws s3 sync . s3://mybucket-${CIRCLE_WORKFLOW_ID:0:7} --delete  
+
+  get_last_deployment_id:
+    docker:
+    - image: amazon/aws-cli
+    steps:
+    - checkout
+    #performs the query and saves the id to a file that we can persist to the workspace. 
+    - run: yum install -y tar gzip
+    - run: 
+      command: |
+            aws cloudformation \
+            list-exports --query "Exports[?Name==\`PipelineID\`].Value" \
+            --no-paginate --output text > ~/textfile.txt
+    - persist_to_workspace:
+        root: ~/
+        paths:
+        - textfile.txt
+
+  promote_to_production:
+    #that executes our cloudfront.yml CloudFormation template used in the manual steps.
+    docker: 
+    - image: amazon/aws-cli
+    steps:
+    - checkout
+    - run:
+        name: Execute cloudfront.yml
+        command: |
+          aws cloudformation deploy \
+          --template-file cloudfront.yml \
+          --stack-name production-distro \
+          --parameter-overrides PipelineID="mybucket-${CIRCLE_WORKFLOW_ID:0:7}"
+
+  clean_up_old_front_end:
+  #uses the pipeline ID to destroy the previous production version's S3 bucket and CloudFormation stack. To achieve this, you need to retrieve from the workspace the file where the previous Pipeline ID was stored. Once you have the Pipeline ID              
+    docker:
+      - image: amazon/aws-cli
+    steps:
+    - checkout
+    - run: yum install -y tar gzip
+    - attach_workspace:
+        at: ~/
+    - run:
+        name: Destroy the previous S3 bucket and CloudFormation stack. 
+        # Use $OldBucketID environment variable or mybucket644752792305 below.
+        # Similarly, you can create and use $OldStackID environment variable in place of production-distro 
+        command: |
+          export OldBucketID=$(cat ~/textfile.txt)
+          aws s3 rm "s3://${OldBucketID}" --recursive
+
      
 
 # Invoke jobs via workflows
@@ -72,4 +151,9 @@ jobs:
 workflows:
   create_infrastructure-workflow:
     jobs:
-      - smoke_test
+        - create_and_deploy_front_end
+        - promote_to_production:
+            requires: 
+              - create_and_deploy_front_end
+        - get_last_deployment_id
+       
